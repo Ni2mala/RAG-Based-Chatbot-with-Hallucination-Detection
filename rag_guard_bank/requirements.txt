@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+streamlit
+requests
+pydantic-settings
+python-dotenv
+datasets
+pandas
+pyarrow
+chromadb
+ollama
+transformers
