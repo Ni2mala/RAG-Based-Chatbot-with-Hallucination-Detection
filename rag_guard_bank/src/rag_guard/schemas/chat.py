@@ -12,6 +12,8 @@ class Verification(BaseModel):
     status: str = "not_checked"
     nli_grounding: float | None = None
     llm_grounding: float | None = None
+    unsupported_claims: list[str] = Field(default_factory=list)
+    detector: str | None = None
 
 
 class ChatRequest(BaseModel):
