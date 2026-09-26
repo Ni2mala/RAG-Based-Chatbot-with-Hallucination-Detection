@@ -24,15 +24,16 @@ Local offline stack: Ollama llama3.2 + Chroma vector store + NLI + LLM-judge.
 [7] Tests/Docker + code walkthrough  TODO
 
 ## Open items (stage 5)
-1. NLI=0.0 vs LLM-judge=0.9 on a grounded question → suspected id2label case mismatch
-   in src/rag_guard/guardrails/grounding_check.py (compares name=="entailment").
-   NEXT: inspect config.id2label, map labels correctly, re-run test_guardrails.py.
+1. [RESOLVED] NLI=0.0 vs LLM-judge=0.9 label-mapping bug. Fixed in grounding_check.py
+   (_resolve() + top_k + lowercased id2label). Verified via test_nli.py: block-card
+   claims get real scores (entailment 1.00/0.73/0.59/0.41), grounding=0.57.
 2. Generator self-refusal gets re-wrapped by our refusal_message (transfer-duration
    answer is clunky). Polish wording logic.
 
-## Verified behavior (today)
-- Blocked card → grounded-ish answer (partial; blocked by NLI bug above)
-- "How long does a bank transfer take?" → refused, NLI=0.0 AND judge=0.0 (no data in KB)
+## Verified behavior
+- Blocked card → NLI 0.57 vs LLM-judge 0.9 → both-mode avg 0.735 = grounded.
+  NLI is claim-strict, judge holistic (thesis finding).
+- "How long does a bank transfer take?" → refused; NLI=0.0 AND judge=0.0 (no data in KB)
 - "Weather in Paris?" → refused at retrieval (relevance 0.475 < 0.55), no LLM cost
 
 ## Key design facts
@@ -43,12 +44,12 @@ Local offline stack: Ollama llama3.2 + Chroma vector store + NLI + LLM-judge.
 - Thresholds/.env: RELEVANCE_MIN_SCORE=0.55, GROUNDING_THRESHOLD=0.7, ADMIN_TOKEN.
 
 ## Next session checklist
-1. Commit working tree (claim_extractor.py, grounding_check.py fixes + test_nli.py)
-2. Fix NLI label mapping; revalidate
-3. Clean double-wrapped refusal wording
-4. Streamlit: display nli/llm_grounding + unsupported claims
-5. Stage 6: eval set (held-out Bitext + out-of-domain + prompt injection) →
-   scripts/run_evaluation.py comparing baseline vs NLI vs LLM-judge, metrics to reports/
+1. Baseline mode="none" in detector/chat_service
+2. Clean double-wrapped refusal wording
+3. Streamlit: display nli/llm_grounding + unsupported claims
+4. Stage 6: build_eval_set.py (35 q) → run_evaluation.py (configs none/nli/llm/both)
+   → metrics + charts to reports/
+5. Write THESIS_DOCUMENTATION.md with real results
 6. Optional: add HF_TOKEN to silence download warning
 
 ## Pitfalls

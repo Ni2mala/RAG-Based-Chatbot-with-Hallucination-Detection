@@ -1,3 +1,4 @@
+import re
 from typing import Sequence
 
 from transformers import pipeline
@@ -17,18 +18,21 @@ class GroundingChecker:
         self._pipe = pipeline("text-classification", model=model, device=-1)
         try:
             id2label = self._pipe.model.config.id2label
-            self._index_to_name = {int(k): str(v) for k, v in id2label.items()}
+            if id2label is None:
+                id2label = {}
+            self._index_to_name = {int(k): str(v).strip().lower() for k, v in id2label.items()}
         except Exception:
-            self._index_to_name = LABEL_BY_INDEX
+            self._index_to_name = dict(LABEL_BY_INDEX)
+        self._name_to_index = {v: k for k, v in self._index_to_name.items()}
 
-    @staticmethod
-    def _parse_index(label: str) -> int | None:
-        if label.startswith("LABEL_"):
-            try:
-                return int(label.split("_")[-1])
-            except ValueError:
-                return None
-        return None
+    def _resolve(self, label: str) -> str:
+        name = label.strip().lower()
+        if name in self._name_to_index:
+            return self._index_to_name[self._name_to_index[name]]
+        match = re.fullmatch(r"label_(\d+)", name)
+        if match:
+            return self._index_to_name.get(int(match.group(1)), name)
+        return name
 
     def check(
         self,
@@ -38,25 +42,39 @@ class GroundingChecker:
     ) -> list[dict]:
         results: list[dict] = []
         for claim in claims:
-            max_ent = 0.0
-            max_contra = 0.0
+            scores = {"entailment": 0.0, "contradiction": 0.0, "neutral": 0.0}
             for ctx in contexts:
-                pred = self._pipe({"text": ctx, "text_pair": claim}, truncation=True)
-                if isinstance(pred, list):
-                    pred = pred[0]
-                idx = self._parse_index(pred["label"])
-                name = self._index_to_name.get(idx, "neutral") if idx is not None else "neutral"
-                if name == "entailment":
-                    max_ent = max(max_ent, pred["score"])
-                elif name == "contradiction":
-                    max_contra = max(max_contra, pred["score"])
+                preds = self._pipe(
+                    {"text": ctx, "text_pair": claim},
+                    truncation=True,
+                    top_k=len(self._index_to_name),
+                )
+                if isinstance(preds, dict):
+                    preds = [preds]
+                flat = []
+                for p in preds:
+                    flat.extend(p if isinstance(p, list) else [p])
+                for p in flat:
+                    name = self._resolve(p["label"])
+                    if name in scores:
+                        scores[name] = max(scores[name], float(p["score"]))
+            max_ent = scores["entailment"]
+            max_contra = scores["contradiction"]
             supported = max_ent >= entail_threshold and max_ent >= max_contra
-            verdict = "entailment" if max_ent >= max_contra else "contradiction"
+            if supported:
+                verdict = "entailment"
+            elif max_contra > max_ent:
+                verdict = "contradiction"
+            else:
+                verdict = "neutral"
             results.append(
                 {
                     "claim": claim,
                     "verdict": verdict,
                     "score": round(max(max_ent, max_contra), 3),
+                    "entailment": round(max_ent, 3),
+                    "contradiction": round(max_contra, 3),
+                    "neutral": round(scores["neutral"], 3),
                     "supported": supported,
                 }
             )
