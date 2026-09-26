@@ -36,8 +36,16 @@ for msg in st.session_state["messages"]:
             st.markdown(
                 f"- {s['intent']} (category {s['category']}) - similarity {s['score']:.2f}"
             )
-        if msg.get("status"):
-            st.markdown(f"**Verification:** {msg['status']}")
+if msg.get("status"):
+            parts = [f"**Verification:** `{msg['status']}`"]
+            if msg.get("nli_grounding") is not None:
+                parts.append(f"NLI: {msg['nli_grounding']:.2f}")
+            if msg.get("llm_grounding") is not None:
+                parts.append(f"LLM-judge: {msg['llm_grounding']:.2f}")
+            st.markdown(" &nbsp;·&nbsp; ".join(parts))
+            if msg.get("unsupported"):
+                n = len(msg["unsupported"])
+                st.markdown(f"Unsupported claims detected: {n}")
 
 if prompt := st.chat_input("Ask a banking question..."):
     st.chat_message("user").markdown(prompt)
@@ -60,10 +68,20 @@ if prompt := st.chat_input("Ask a banking question..."):
                 f"- {s['intent']} (category {s['category']}) - similarity {s['score']:.2f}"
             )
 
-        v = data.get("verification", {})
+v = data.get("verification", {})
         status = v.get("status", "n/a")
         rel = v.get("retrieval_relevance", 0.0)
-        st.markdown(f"**Verification:** {status} (retrieval relevance {rel:.2f})")
+        nli = v.get("nli_grounding")
+        llm = v.get("llm_grounding")
+        line = f"**Verification:** `{status}` (relevance {rel:.2f})"
+        if nli is not None:
+            line += f" · NLI: {nli:.2f}"
+        if llm is not None:
+            line += f" · LLM-judge: {llm:.2f}"
+        st.markdown(line)
+        unsupported = v.get("unsupported_claims") or []
+        if unsupported:
+            st.markdown(f"Unsupported claims detected: {len(unsupported)}")
 
     st.session_state["messages"].append(
         {
@@ -71,5 +89,8 @@ if prompt := st.chat_input("Ask a banking question..."):
             "content": answer,
             "sources": sources,
             "status": status,
+            "nli_grounding": nli,
+            "llm_grounding": llm,
+            "unsupported": unsupported,
         }
     )

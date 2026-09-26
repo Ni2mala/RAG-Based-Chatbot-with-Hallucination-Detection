@@ -10,3 +10,4 @@ pyarrow
 chromadb
 ollama
 transformers
+matplotlib

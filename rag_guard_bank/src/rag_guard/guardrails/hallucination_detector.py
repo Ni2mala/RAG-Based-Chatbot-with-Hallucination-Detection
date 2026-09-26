@@ -26,8 +26,8 @@ class HallucinationDetector:
 
     @staticmethod
     def _normalize(mode: str) -> str:
-        mode = mode.lower()
-        return mode if mode in ("nli", "llm", "both") else "both"
+        mode = mode.lower().strip()
+        return mode if mode in ("none", "nli", "llm", "both") else "both"
 
     def _ensure_loaded(self, mode: str) -> None:
         if mode in ("nli", "both") and self._nli is None:
@@ -42,6 +42,9 @@ class HallucinationDetector:
         mode: str | None = None,
     ) -> DetectionResult:
         mode = self._normalize(mode) if mode else self._mode
+        if mode == "none":
+            return DetectionResult(detector="none", status="unguarded")
+
         self._ensure_loaded(mode)
 
         result = DetectionResult(detector=mode)

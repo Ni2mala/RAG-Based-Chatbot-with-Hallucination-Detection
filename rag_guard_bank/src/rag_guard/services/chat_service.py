@@ -5,6 +5,22 @@ from rag_guard.schemas.chat import ChatRequest, ChatResponse, Source, Verificati
 from rag_guard.guardrails.hallucination_detector import HallucinationDetector
 from rag_guard.guardrails.refusal import refusal_message
 
+SELF_REFUSAL_PATTERNS = (
+    "i could not find",
+    "could not find sufficient information",
+    "i am unable to",
+    "i'm unable to",
+    "cannot provide",
+    "is not able to provide",
+    "not able to provide",
+    "no information",
+)
+
+
+def is_self_refusal(answer: str) -> bool:
+    lowered = answer.lower()
+    return any(pattern in lowered for pattern in SELF_REFUSAL_PATTERNS)
+
 
 class ChatService:
     def __init__(self, retriever: Retriever, generator: Generator) -> None:
@@ -32,6 +48,18 @@ class ChatService:
             )
 
         answer = self._generator.generate(request.question, [c.text for c in chunks])
+
+        if is_self_refusal(answer):
+            return ChatResponse(
+                answer=answer,
+                sources=sources,
+                verification=Verification(
+                    retrieval_relevance=round(max_relevance, 3),
+                    status="insufficient_evidence",
+                ),
+                refused=True,
+            )
+
         detection = self._detector.detect(
             answer, [c.text for c in chunks], mode=request.mode
         )

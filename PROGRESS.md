@@ -19,16 +19,14 @@ Local offline stack: Ollama llama3.2 + Chroma vector store + NLI + LLM-judge.
 [2] RAG pipeline                     DONE  (130 docs / 210 chunks, Chroma `bank_faq`)
 [3] FastAPI + Streamlit UI           DONE  (/chat /health /admin/ingest)
 [4] UI verified + wording polish     DONE
-[5] Hallucination detectors          DONE & RUNNING — 1 suspected bug + 1 polish item (below)
-[6] Evaluation harness (metrics)     TODO
-[7] Tests/Docker + code walkthrough  TODO
+[5] Hallucination detectors          DONE & VALIDATED (NLI label bug fixed; "none" baseline mode added)
+[6] Evaluation harness (metrics)     DONE  (35-q eval -> reports/; see THESIS_DOCUMENTATION.md)
+[7] Tests/Docker + code walkthrough  OPTIONAL (not started)
 
 ## Open items (stage 5)
-1. [RESOLVED] NLI=0.0 vs LLM-judge=0.9 label-mapping bug. Fixed in grounding_check.py
-   (_resolve() + top_k + lowercased id2label). Verified via test_nli.py: block-card
-   claims get real scores (entailment 1.00/0.73/0.59/0.41), grounding=0.57.
-2. Generator self-refusal gets re-wrapped by our refusal_message (transfer-duration
-   answer is clunky). Polish wording logic.
+1. [RESOLVED] NLI label-mapping bug. Fixed in grounding_check.py (_resolve + top_k + lowercase).
+2. [DONE] Self-refusal no longer double-wrapped (is_self_refusal in chat_service).
+3. [DONE] Streamlit shows NLI / LLM-judge scores + unsupported-claims count.
 
 ## Verified behavior
 - Blocked card → NLI 0.57 vs LLM-judge 0.9 → both-mode avg 0.735 = grounded.
@@ -44,13 +42,13 @@ Local offline stack: Ollama llama3.2 + Chroma vector store + NLI + LLM-judge.
 - Thresholds/.env: RELEVANCE_MIN_SCORE=0.55, GROUNDING_THRESHOLD=0.7, ADMIN_TOKEN.
 
 ## Next session checklist
-1. Baseline mode="none" in detector/chat_service
-2. Clean double-wrapped refusal wording
-3. Streamlit: display nli/llm_grounding + unsupported claims
-4. Stage 6: build_eval_set.py (35 q) → run_evaluation.py (configs none/nli/llm/both)
-   → metrics + charts to reports/
-5. Write THESIS_DOCUMENTATION.md with real results
-6. Optional: add HF_TOKEN to silence download warning
+1. Review/edit THESIS_DOCUMENTATION.md (results now filled from real run)
+2. Optional tuning: NLI entail_threshold, GROUNDING_THRESHOLD, TOP_K (8?) to cut
+   in-domain over-refusal (nli wrongly refused 85% of in-domain in eval)
+3. Optional: tests (pytest), Docker packaging
+4. Optional: full code walkthrough with user
+5. Optional: add HF_TOKEN to silence download warning
+6. Future: bigger labeled eval set for statistical significance
 
 ## Pitfalls
 - HF pipeline pairs must be {"text":..,"text_pair":..} and return a dict (not list)
