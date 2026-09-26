@@ -41,7 +41,9 @@ class GroundingChecker:
             max_ent = 0.0
             max_contra = 0.0
             for ctx in contexts:
-                pred = self._pipe((ctx, claim))[0]
+                pred = self._pipe({"text": ctx, "text_pair": claim}, truncation=True)
+                if isinstance(pred, list):
+                    pred = pred[0]
                 idx = self._parse_index(pred["label"])
                 name = self._index_to_name.get(idx, "neutral") if idx is not None else "neutral"
                 if name == "entailment":
