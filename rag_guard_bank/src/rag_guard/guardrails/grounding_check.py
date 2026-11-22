@@ -10,6 +10,21 @@ logger = get_logger(__name__)
 
 LABEL_BY_INDEX = {0: "contradiction", 1: "entailment", 2: "neutral"}
 
+_STOP = set("a an the to of and or in on at for you your our is are be can will with this that it as by from if any have has please".split())
+_QA_HEADER = re.compile(r"^Question:.*?\nAnswer:\s*", re.DOTALL)
+WINDOWS_PER_CLAIM = 3
+
+
+def _tokens(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z']+", text.lower()) if w not in _STOP and len(w) > 2}
+
+
+def _windows(context: str) -> list[str]:
+    """Sentences of the stored answer, plus every pair of neighbouring sentences."""
+    body = _QA_HEADER.sub("", context)
+    sents = [p.strip() for p in re.split(r"(?<=[.!?])\s+|\n+", body) if len(p.strip()) > 8]
+    return sents + [" ".join(sents[i : i + 2]) for i in range(len(sents) - 1)]
+
 
 class GroundingChecker:
     def __init__(self, model_name: str | None = None) -> None:
@@ -40,10 +55,18 @@ class GroundingChecker:
         contexts: Sequence[str],
         entail_threshold: float = 0.4,
     ) -> list[dict]:
+        # Premises are the few context sentences that best overlap each claim, not whole
+        # ~900-character Q+A chunks: the small NLI model gives near-zero entailment to a
+        # sentence that is quoted verbatim inside a long premise (7/48 true claims passed
+        # vs 48/48 with sentence premises; 0/70 fabricated claims passed either way).
+        # Thresholds are unchanged. Choosing windows by overlap can only drop support.
+        windows = [w for c in contexts for w in _windows(c)]
         results: list[dict] = []
         for claim in claims:
             scores = {"entailment": 0.0, "contradiction": 0.0, "neutral": 0.0}
-            for ctx in contexts:
+            claim_tokens = _tokens(claim)
+            best = sorted(windows, key=lambda w: -len(claim_tokens & _tokens(w)))[:WINDOWS_PER_CLAIM]
+            for ctx in best:
                 preds = self._pipe(
                     {"text": ctx, "text_pair": claim},
                     truncation=True,

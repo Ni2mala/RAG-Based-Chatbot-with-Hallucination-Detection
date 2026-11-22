@@ -20,9 +20,11 @@ Mark items `[x]` as they are done.
 
 ## 2. Improve detection quality (the research core, 40 + 20 marks)
 
-- [ ] Claim extraction: filter non-factual sentences ("Please contact support") before NLI (ADR-07). Test it as a hypothesis, since NLI's 85% in-domain refusal may come from this.
+- [x] NLI now uses sentence-window premises (top 3 per claim): false refusals 30% -> 16%, no extra unanswerable answers (see QA_REPORT Addendum 3).
+- [ ] Claim extraction (optional now): filter non-factual sentences ("Please contact support") before NLI (ADR-07). Test it as a hypothesis, since NLI's 85% in-domain refusal may come from this.
 - [x] Self-refusal check now length-limited, wording unified, one wider-context retry (still a substring check; structured output is a possible upgrade).
 - [x] Judge bug fixed: it mistook stored customer questions for claims (A8 scored 0.0 every time). Still open: scores saturate at 0.8; try a larger judge or per-claim judging (ADR-05).
+- [ ] Remaining false refusals: slang/typo questions below the retry trigger (idea: intent-agreement trigger or spelling normalization, leak-test first).
 - [ ] Re-tune thresholds on labeled data: NLI entail 0.4, relevance gate (about 0.68 separated better), `GROUNDING_THRESHOLD`, `TOP_K`.
 - [x] Hard-block answers that contain numbers not in the documents (ADR-04 follow-up). Still open: other partially_supported answers ship.
 - [x] Basic input-side injection screening (`input_filter.py`) and unsupported-figure check (`figure_check.py`).

@@ -101,3 +101,55 @@ Still open and visible in the same run:
 - **A21 ("block card", 2 words)** is refused: relevance 0.674 is below the retry threshold of 0.75, and the model refused.
 - **A19** shows the model echoing prompt text ("CONTEXT: ANSWER TO QUESTION ...") in its answer.
 - Run-to-run variation is large (temperature 0.2, no seed), so one rerun is not a statistic. Quote rates only from a repeated, larger evaluation.
+
+## Addendum 3: root-cause analysis of the remaining false refusals (2026-11-22)
+
+Goal set by the owner: fewer false refusals **without** more unsupported answers, without lowering a threshold or weakening the detector. Method: a controlled ablation (`qa/run_ablation.py`) with 38 answerable and 29 unanswerable questions (out-of-domain, injection, and "tempting" probes such as exact fees and limits), 2-3 repetitions per configuration, injection keyword filter switched off so the underlying guards are what is measured. Raw data: `qa/ablation_*.jsonl`.
+
+### Cause of each false refusal
+
+| Cause | Questions affected | Evidence |
+|---|---|---|
+| **NLI premise too long (detector false alarm)** | cancel credit card, set up password, card annual fees, stolen amex, human operator, cancel transfer, check annual fee, create account | Every claim in these answers is near-verbatim in the retrieved text (lexical overlap 1.00), yet only 7 of 48 true claims passed NLI. The small cross-encoder gives near-zero entailment to a sentence quoted inside a ~900-character Q+A premise. With sentence premises 48 of 48 pass. |
+| **Model self-refusal below the retry trigger** | slang and typo questions (ATM search, cancel a loan, card balance, "I cannot find my fee"), relevance 0.69-0.73 | Refused in every run; the retry only fires at relevance 0.75 or higher. |
+| **Random model self-refusal at high relevance** | ATM dispute, create account, nearest ATM, client service | The same question flips between answered and refused with only a change of context size. |
+| **Substring self-refusal on a long answer** (fixed earlier) | stolen card | Answer opened with "I could not find..." then gave instructions. |
+| **Judge reading stored customer questions as claims** (fixed earlier) | cancel transfer | Judge scored 0.0 on every run. |
+
+### Does retrieval cause them? No.
+
+208 held-out questions, 210-chunk index:
+
+| Method | Top-1 correct intent | Correct intent in top 5 |
+|---|---|---|
+| Dense (current) | 95.7% | 99.5% |
+| BM25 only | 80.8% | 96.6% |
+| Hybrid BM25 + dense (rank fusion) | 92.3% | 99.5% |
+| Hybrid (score fusion) | 92.8% | 99.5% |
+| Dense, then metadata filter to top-1 intent | 95.7% | 95.7% |
+
+- **Hybrid search** is not better than dense here (slang and typos hurt BM25).
+- **Metadata filtering** can only keep or lower recall; it needs an intent router that dense retrieval already approximates.
+- **Reranking** was not run (it would need a new model download), but a reranker can only reorder the top 5, which already contain the right intent 99.5% of the time. Every refused question had relevance of 0.69 or higher, so retrieval found the right documents.
+- Caveat: the corpus is templated synthetic Q&A, so retrieval is easy. This conclusion may not hold for a real, larger document set; revisit then.
+
+### The change that worked, and the one that did not
+
+**Kept: sentence-window NLI premises** (`guardrails/grounding_check.py`). For each claim, NLI runs against the 3 context sentences (or neighbour pairs) that best overlap it, instead of whole chunks. Thresholds unchanged (entailment 0.4). Safety check: 0 of 70 fabricated and near-miss claims ("Logout button bottom left", "notarized letter", "free of any fees") pass under either scheme. Speed: 2.3 s vs 9.0 s for 5 answers (all windows would take 74.7 s, which is why only the top 3 are used).
+
+**Reverted: the softened system prompt** from the earlier round. Without retry it did not help (12 vs 11.5 false refusals, within noise). The prompt is back to the original.
+
+**Rejected: lowering the retry trigger to the gate (0.55).** No further gain (6.0 vs 6.0) and 4 answers delivered to unanswerable questions over 87 attempts (for example "penalty for early mortgage repayment" got a hedged answer). Retry stays at 0.75.
+
+| Configuration | False refusals (of 38) | Unanswerable questions answered |
+|---|---|---|
+| Original: whole-chunk NLI, no retry | 11.5 (30%) | 0 / 58 |
+| + retry at 0.75 | 10.0 (26%) | 0 / 58 |
+| **Window NLI + retry at 0.75 (current code)** | **6.0 (16%)** | **0 / 87** |
+| Window NLI + retry at 0.55 (rejected) | 6.0 (16%) | 4 / 87 |
+
+Delivered answers also improved: 24 grounded and 8 partially supported per run, against 9-12 grounded and 15-17 partially supported before.
+
+### What remains (6 of 38, all but one are model self-refusals)
+
+Four slang and typo questions are refused every run (relevance 0.69-0.73, below the retry trigger). Next candidate, not implemented: trigger the retry on agreement of the top-3 retrieved chunks' intent instead of a similarity cutoff, or normalize spelling before retrieval. Each needs the same leak test before adoption. Limits: 2-3 repetitions per configuration (run-to-run variation is about plus or minus 2 questions), question sets written by me, and "unsupported answers" is measured with gold labels only on the 29 unanswerable questions; faithfulness of delivered answers is still not human-labelled.
