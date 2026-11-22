@@ -28,6 +28,8 @@ Mark items `[x]` as they are done.
 
 ## 2. Improve detection quality (the research core, 40 + 20 marks)
 
+- [ ] **Main weakness found by the fault test:** one invented sentence inside a correct answer passes (0 of 78 refused under `both`; NLI scores the fraction of supported claims, 0.87 stays above 0.7). Idea: stricter rule for unsupported claims (e.g. require every claim to be supported, or flag the answer when any claim is contradicted/unsupported and the judge agrees). It will raise false refusals, so measure with `run_evaluation.py` and the fault test together before adopting.
+
 - [x] NLI now uses sentence-window premises (top 3 per claim): false refusals 30% -> 16%, no extra unanswerable answers (see QA_REPORT Addendum 3).
 - [ ] Claim extraction (optional now): filter non-factual sentences ("Please contact support") before NLI (ADR-07). Test it as a hypothesis, since NLI's 85% in-domain refusal may come from this.
 - [x] Self-refusal check now length-limited, wording unified, one wider-context retry (still a substring check; structured output is a possible upgrade).
@@ -42,13 +44,13 @@ Mark items `[x]` as they are done.
 
 ## 3. Evaluation (20 marks, needs real rigor)
 
-- [ ] Rebuild the eval set without the gate pre-filter and with more questions (aim for 100+; the 35-question set is too small).
-- [ ] Add **faithfulness labels on answers** (human or checked), so the metric measures hallucination detection and not just "refuse unanswerable questions".
-- [ ] Rename the current metrics to "refusal correctness" until that is done (ADR-15).
-- [ ] Report the baseline (`none`) against each mitigation mode (`nli`, `llm`, `both`), as the proposal promises (hallucination rate, factuality, answer quality before and after).
-- [ ] Fix reproducibility: temperature 0 or a seed, a config hash in the resume file, and a pinned dataset revision.
-- [ ] Rerun the full evaluation after the fixes (about 32 min per 35 questions on CPU, so plan the time) and update `reports/`.
-- [ ] Add pytest tests for claim extraction, the detector's verdict boundaries, `is_self_refusal` and the refusal messages. The rubric asks for a test plan and results.
+- [x] Rebuild the eval set without the gate pre-filter and with more questions (aim for 100+; the 35-question set is too small).
+- [x] Faithfulness without human labels: reference-reply similarity plus a synthetic-fault test (see `docs/EVALUATION_V2.md`). Decision: no human labelling; state this limit in the dissertation. (human or checked), so the metric measures hallucination detection and not just "refuse unanswerable questions".
+- [x] Rename the current metrics to "refusal correctness" until that is done (ADR-15).
+- [x] Report the baseline (`none`) against each mitigation mode (`nli`, `llm`, `both`), as the proposal promises (hallucination rate, factuality, answer quality before and after).
+- [x] Fix reproducibility: temperature 0 or a seed, a config hash in the resume file, and a pinned dataset revision.
+- [x] Rerun the full evaluation after the fixes (about 32 min per 35 questions on CPU, so plan the time) and update `reports/`.
+- [~] (guard, robustness, NLI and metric tests exist; claim-extractor and verdict-boundary tests still missing) Add pytest tests for claim extraction, the detector's verdict boundaries, `is_self_refusal` and the refusal messages. The rubric asks for a test plan and results.
 
 ## 4. Documents required by the university
 

@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     OLLAMA_HOST: str = "http://localhost:11434"
     OLLAMA_TIMEOUT_S: float = 120.0
     LLM_MODEL: str = "llama3.2"
+    # Fixed sampling seed so a rerun gives the same answers (set GENERATION_SEED in .env to change).
+    GENERATION_SEED: int = 42
     EMBEDDING_MODEL: str = "nomic-embed-text"
 
     TOP_K: int = 5

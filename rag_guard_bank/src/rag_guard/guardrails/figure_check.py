@@ -14,8 +14,9 @@ def unsupported_figures(answer: str, contexts: list[str]) -> list[str]:
 
     Fees, rates and limits are the costliest thing to invent, so any figure the documents
     don't contain is treated as unsupported regardless of the detector scores.
-    Numbered list markers ("1. Open the app") are ignored.
+    Numbered list markers ("1. Open the app") are ignored in the answer AND in the contexts, otherwise
+    a step number in a document would "support" an invented "2 requests" or "3 days".
     """
     stripped = _LIST_MARKER.sub("", answer)
-    known = _figures("\n".join(contexts))
+    known = _figures(_LIST_MARKER.sub("", "\n".join(contexts)))
     return sorted(f for f in _figures(stripped) if f not in known)

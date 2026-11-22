@@ -19,7 +19,7 @@ class Generator:
                 model=self._model,
                 system=SYSTEM_PROMPT,
                 prompt=prompt,
-                options={"temperature": 0.2, "num_predict": 600},
+                options={"temperature": 0.2, "num_predict": 600, "seed": settings.GENERATION_SEED},
             ),
             "Ollama generate",
         )

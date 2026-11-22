@@ -41,6 +41,12 @@ def test_invented_fee_flagged():
     assert unsupported_figures("Interest is 3.5% per year.", ctx) == ["3.5"]
 
 
+def test_step_numbers_in_documents_do_not_support_invented_figures():
+    ctx = ["Question: x\nAnswer: Follow these steps:\n1. Open the app.\n2. Tap Cards.\n3. Confirm."]
+    assert unsupported_figures("The request is completed within 3 business days.", ctx) == ["3"]
+    assert unsupported_figures("You are limited to 2 requests per year.", ctx) == ["2"]
+
+
 def test_supported_and_list_numbers_ok():
     ctx = ["Question: x\nAnswer: Call support. Lines are open 24 hours. The fee is $10."]
     assert unsupported_figures("1. Open the app.\n2. Tap Cards.\n3) Confirm.", ctx) == []
