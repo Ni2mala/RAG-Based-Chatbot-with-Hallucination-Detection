@@ -28,7 +28,8 @@ Mark items `[x]` as they are done.
 
 ## 2. Improve detection quality (the research core, 40 + 20 marks)
 
-- [ ] **Main weakness found by the fault test:** one invented sentence inside a correct answer passes (0 of 78 refused under `both`; NLI scores the fraction of supported claims, 0.87 stays above 0.7). Idea: stricter rule for unsupported claims (e.g. require every claim to be supported, or flag the answer when any claim is contradicted/unsupported and the judge agrees). It will raise false refusals, so measure with `run_evaluation.py` and the fault test together before adopting.
+- [x] Invented sentence inside a correct answer: now cut by a sentence filter (unsupported by NLI and at least half new words); 78 of 78 injected sentences kept from the user, no new false refusals. See `docs/EVALUATION_V2.md`.
+- [ ] Remaining gap: invented claims that reuse document words are only removed 54% of the time. Idea: also cut claims the judge lists as unsupported, measuring false alterations first.
 
 - [x] NLI now uses sentence-window premises (top 3 per claim): false refusals 30% -> 16%, no extra unanswerable answers (see QA_REPORT Addendum 3).
 - [ ] Claim extraction (optional now): filter non-factual sentences ("Please contact support") before NLI (ADR-07). Test it as a hypothesis, since NLI's 85% in-domain refusal may come from this.

@@ -5,7 +5,7 @@ from rag_guard.core.config import settings
 from rag_guard.core.logging import get_logger
 from rag_guard.guardrails.claim_extractor import extract_claims
 from rag_guard.guardrails.figure_check import unsupported_figures
-from rag_guard.guardrails.grounding_check import GroundingChecker
+from rag_guard.guardrails.grounding_check import GroundingChecker, invented_claims
 from rag_guard.guardrails.llm_judge import LLMJudge
 
 logger = get_logger(__name__)
@@ -21,6 +21,7 @@ class DetectionResult:
     detector: str = "none"
     seconds: float = 0.0  # time spent in NLI and/or judge for this mode
     score: float = 0.0    # combined grounding score before the figure check
+    invented_claims: list[str] = field(default_factory=list)  # to be removed from the delivered answer
 
 
 class HallucinationDetector:
@@ -70,7 +71,7 @@ class HallucinationDetector:
         claims = extract_claims(answer)
         comps = {
             "claims": len(claims),
-            "nli": None, "nli_unsupported": [],
+            "nli": None, "nli_unsupported": [], "invented": [],
             "llm": None, "llm_unsupported": [],
             "figures": unsupported_figures(answer, contexts),
             "nli_s": 0.0, "llm_s": 0.0,
@@ -84,6 +85,7 @@ class HallucinationDetector:
             comps["nli_s"] = time.time() - t
             comps["nli"] = sum(r["supported"] for r in checks) / len(checks)
             comps["nli_unsupported"] = [r["claim"] for r in checks if not r["supported"]]
+            comps["invented"] = invented_claims(checks, contexts, settings.INVENTED_MIN_NOVELTY)
         if judge and self._judge is not None:
             t = time.time()
             try:
@@ -106,6 +108,7 @@ class HallucinationDetector:
         unsupported: list[str] = []
         if mode in ("nli", "both"):
             result.nli_grounding = comps["nli"]
+            result.invented_claims = comps["invented"]
             unsupported += comps["nli_unsupported"]
         if mode in ("llm", "both"):
             result.llm_grounding = comps["llm"]

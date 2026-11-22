@@ -32,7 +32,9 @@ def render_assistant(msg: dict) -> None:
     if msg.get("llm_grounding") is not None:
         line += f" · LLM-judge: {msg['llm_grounding']:.2f}"
     st.markdown(line)
-    if msg.get("unsupported"):
+    if msg.get("removed"):
+        st.markdown(f"Unsupported sentences removed from this answer: {len(msg['removed'])}")
+    elif msg.get("unsupported"):
         st.markdown(f"Unsupported claims detected: {len(msg['unsupported'])}")
 
 
@@ -71,6 +73,7 @@ if prompt := st.chat_input("Ask a banking question..."):
                 "nli_grounding": v.get("nli_grounding"),
                 "llm_grounding": v.get("llm_grounding"),
                 "unsupported": v.get("unsupported_claims") or [],
+                "removed": v.get("removed_claims") or [],
             }
             render_assistant(reply)
             st.session_state["messages"].append(reply)

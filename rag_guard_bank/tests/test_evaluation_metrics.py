@@ -41,8 +41,8 @@ def test_reference_quality_only_counts_delivered_answers():
     rows[0].update(reference_similarity=0.9, control_similarity=0.6)    # on topic, delivered everywhere
     rows[1].update(reference_similarity=0.7, control_similarity=0.8)    # off topic; refused by nli and both
     q = ev.compute_metrics(rows)
-    assert q["none"]["answer_quality"] == {"delivered": 2, "mean_reference_similarity": 0.8, "on_topic_rate": 0.5}
-    assert q["both"]["answer_quality"] == {"delivered": 1, "mean_reference_similarity": 0.9, "on_topic_rate": 1.0}
+    assert q["none"]["answer_quality"] == {"delivered": 2, "answers_with_sentences_removed": 0, "mean_reference_similarity": 0.8, "on_topic_rate": 0.5}
+    assert q["both"]["answer_quality"] == {"delivered": 1, "answers_with_sentences_removed": 0, "mean_reference_similarity": 0.9, "on_topic_rate": 1.0}
 
 
 if __name__ == "__main__":

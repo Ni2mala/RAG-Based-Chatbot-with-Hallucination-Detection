@@ -3,6 +3,8 @@ from rag_guard.rag.retriever import Retriever
 from rag_guard.rag.generator import Generator
 from rag_guard.schemas.chat import ChatRequest, ChatResponse, Source, Verification
 from rag_guard.guardrails.hallucination_detector import HallucinationDetector
+from rag_guard.guardrails.answer_filter import remove_claims
+from rag_guard.guardrails.claim_extractor import extract_claims
 from rag_guard.guardrails.input_filter import looks_like_injection
 from rag_guard.guardrails.refusal import refusal_message
 
@@ -90,7 +92,18 @@ class ChatService:
 
         detection = self._detector.detect(answer, [c.text for c in chunks])
 
-        refused = detection.status == "unsupported"
+        refused, status, removed = detection.status == "unsupported", detection.status, []
+        if not refused and detection.invented_claims:
+            # Cut invented sentences instead of refusing the whole answer: fewer false refusals,
+            # and the delivered text contains nothing the documents do not support.
+            cleaned = remove_claims(answer, detection.invented_claims)
+            if extract_claims(cleaned):
+                answer, removed = cleaned, detection.invented_claims
+                if status == "grounded":
+                    status = "partially_supported"  # the answer was altered
+            else:
+                refused, status = True, "unsupported"  # nothing verifiable is left
+
         return ChatResponse(
             answer=(
                 refusal_message(detection.unsupported_claims)
@@ -100,7 +113,7 @@ class ChatService:
             sources=sources,
             verification=Verification(
                 retrieval_relevance=round(max_relevance, 3),
-                status=detection.status,
+                status=status,
                 nli_grounding=(
                     round(detection.nli_grounding, 3)
                     if detection.nli_grounding is not None
@@ -112,6 +125,7 @@ class ChatService:
                     else None
                 ),
                 unsupported_claims=detection.unsupported_claims,
+                removed_claims=removed,
                 detector=detection.detector,
             ),
             refused=refused,

@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     RETRY_MIN_RELEVANCE: float = 0.75
     RETRY_TOP_K: int = 8
     GROUNDING_THRESHOLD: float = 0.7
+    # A claim is 'invented' when NLI finds it unsupported and at least this share of its words appear in no chunk.
+    INVENTED_MIN_NOVELTY: float = 0.5
 
     NLI_MODEL: str = "cross-encoder/nli-deberta-v3-small"
     DETECTOR_MODE: str = "both"

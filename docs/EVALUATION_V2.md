@@ -61,22 +61,43 @@ Reading: when the bot answers, it answers about the right thing, and the detecto
 - **fabricated claim:** the good answer plus one invented sentence without numbers ("A manager must personally approve the request...").
 - **fabricated figure:** the good answer plus one invented sentence with a figure ("A processing fee of $25 applies...", "within 3 business days").
 
-Share of answers **refused** (status `unsupported`; for `good` lower is better, for faults higher is better):
+### Detection (answer refused, status `unsupported`)
 
 | Detector | good (false alarm) | wrong topic | fabricated claim | fabricated figure |
 |---|---|---|---|---|
-| nli | 0% | 83% | **0%** | 100% |
-| llm judge | 9% | 82% | 32% | 100% |
-| **both (default)** | **0%** | **83%** | **0%** | **100%** |
-| figure check alone | 0% | 1% | 0% | 100% |
+| nli | 0% | 82% | 0% | 100% |
+| llm judge | 9% | 80% | 33% | 100% |
+| **both (default)** | **0%** | **80%** | **0%** | **100%** |
+| figure check alone | 0% | 0% | 0% | 100% |
 
-Ignoring the figure check, NLI and the judge together catch **0%** of the fabricated figures (judge alone 6%). Every figure fault is stopped by the deterministic figure check, not by the language models.
+Ignoring the figure check, NLI and the judge together catch 0% of the fabricated figures (judge alone 5%). Every figure fault is stopped by the deterministic figure check, not by the language models.
 
-Findings:
-1. **Wrong-topic answers are caught well** (65 of 78 refused, 12 more flagged partially supported, 1 passed as grounded).
-2. **Fabricated figures are caught only because of the figure check.** NLI and the judge do not notice them.
-3. **Main weakness: one invented sentence inside an otherwise correct answer passes.** Under `both`, 0 of 78 were refused; 31 were graded partially supported and 47 grounded. NLI scores the answer as the *fraction* of supported claims (mean 0.87 with one bad claim among about 8), which stays above the 0.7 threshold. The judge scores 0.51 on these but is unreliable (it also refuses 9% of verbatim-correct answers).
-4. The test found a bug in the figure check: a step number in a document ("2.") counted as support for an invented "2 requests per year", so 18 of 78 invented figures slipped through. Fixed: list markers are now ignored in the documents too (78 of 78 caught, still 0 false alarms on good answers).
+### Sentence filter (added after the first run exposed a weakness)
+
+The first run showed that **one invented sentence inside a correct answer passed**: under `both`, 0 of 78 were refused, because NLI scores the *fraction* of supported claims (0.87 with one bad claim among about 8, above the 0.7 threshold). Refusing every answer with an unsupported claim would have raised false refusals, since NLI marks about 24% of natural, paraphrased claims unsupported (83 of 351). So `ChatService` now cuts **invented** sentences from the answer instead: a claim is invented when NLI finds it unsupported *and* at least half of its words appear in no retrieved chunk (`INVENTED_MIN_NOVELTY` = 0.5). If nothing verifiable is left, the answer is refused.
+
+Share of faults that do **not reach the user** (refused, or the invented sentence is cut out):
+
+| Detector | good answers changed | wrong topic | fabricated claim | fabricated figure |
+|---|---|---|---|---|
+| nli | 0% | 82% | **100%** (was 0%) | 100% |
+| **both** | **0%** | **80%** | **100%** (was 0%) | **100%** |
+
+Effect on the real evaluation (129 questions, run after the change): false refusals and leaks are **unchanged** (`both`: 14 of 78 and 0 of 51). In 6 of the 64 delivered answerable answers (9%) the filter cut one or more sentences. No new refusals.
+
+Where the filter stops working (measured on 26 questions x 10 or 5 injected claims):
+
+| Injected claim type | NLI marks unsupported | Filter removes it |
+|---|---|---|
+| New words ("notarized letter", "Logout button bottom left") | 100% | 96% |
+| Reuses document words but asserts something new ("Contact customer support and they will refund all fees") | 100% | **54%** |
+
+So the filter reliably removes invented content with new vocabulary but misses about half of plausible-sounding inventions made from the documents' own words. Those still lower the NLI score but are not cut.
+
+### Other findings
+- Wrong-topic answers are caught reasonably (about 80% refused, nearly all the rest graded partially supported or lower).
+- The test found a bug in the figure check: a step number in a document ("2.") counted as support for an invented "2 requests per year", so 18 of 78 invented figures slipped through. Fixed: list markers are ignored in the documents too.
+- The wrong-topic and fabricated-sentence samples differ slightly between the runs (the random draws were reordered), so small shifts such as 83% to 80% are sampling, not a change in behaviour.
 
 Limits: injected faults are easier than natural hallucinations; copied text is the easy case for `good` (natural paraphrase false alarms are the false-refusal rate above); fault templates are few (8 claims, 6 figures) and chosen by me.
 

@@ -25,6 +25,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from rag_guard.core.config import PROJECT_ROOT, settings
+from rag_guard.guardrails.answer_filter import remove_claims
+from rag_guard.guardrails.claim_extractor import extract_claims
 from rag_guard.guardrails.figure_check import unsupported_figures
 from rag_guard.guardrails.hallucination_detector import HallucinationDetector
 from rag_guard.rag.retriever import Retriever
@@ -72,14 +74,17 @@ def build_cases(evals: list[dict], retriever: Retriever) -> list[dict]:
         rng = random.Random(f"{SEED}-{q['id']}")
         contexts = [c.text for c in retriever.retrieve(q["question"])]
         good = answer_body(contexts[0])
+        claim, figure = rng.choice(FABRICATED_CLAIMS), rng.choice(FABRICATED_FIGURES)
         answers = {
             "good": good,
             "wrong_topic": rng.choice([g for g in golds if g[0] != q["gold_intent"]])[1],
-            "fabricated_claim": f"{good} {rng.choice(FABRICATED_CLAIMS)}",
-            "fabricated_figure": f"{good} {rng.choice(FABRICATED_FIGURES)}",
+            "fabricated_claim": f"{good} {claim}",
+            "fabricated_figure": f"{good} {figure}",
         }
+        injected = {"fabricated_claim": claim, "fabricated_figure": figure}
         for kind in KINDS:
-            cases.append({"qid": q["id"], "kind": kind, "answer": answers[kind], "contexts": contexts})
+            cases.append({"qid": q["id"], "kind": kind, "answer": answers[kind], "contexts": contexts,
+                          "injected": injected.get(kind)})
     return cases
 
 
@@ -88,6 +93,21 @@ def score_only_status(score: float) -> str:
     if score >= settings.GROUNDING_THRESHOLD:
         return "grounded"
     return "partially_supported" if score >= settings.GROUNDING_THRESHOLD / 2 else "unsupported"
+
+
+def cleaned(r: dict, mode: str) -> str:
+    """The answer as ChatService would deliver it: invented sentences cut out."""
+    return remove_claims(r["answer"], r[mode]["invented"]) if r[mode]["invented"] else r["answer"]
+
+
+def handled_by(r: dict, mode: str) -> bool:
+    """True when the fault does not reach the user: the answer is refused, or the invented sentence is cut out."""
+    if r[mode]["status"] == "unsupported":
+        return True
+    if r["kind"] != "fabricated_claim" or not r[mode]["invented"]:
+        return False
+    out = cleaned(r, mode)
+    return bool(extract_claims(out)) and r["injected"] not in out or not extract_claims(out)
 
 
 def summarize(results: list[dict]) -> dict:
@@ -103,7 +123,14 @@ def summarize(results: list[dict]) -> dict:
                 refused = sum(r[mode]["status"] == "unsupported" for r in rows)
                 flagged = sum(r[mode]["status"] != "grounded" for r in rows)
                 scores_only = sum(score_only_status(r[mode]["score"]) == "unsupported" for r in rows)
+            handled = altered = None
+            if mode != "figure_check_only":
+                handled = sum(handled_by(r, mode) for r in rows)
+                altered = sum(1 for r in rows if kind == "good" and r[mode]["status"] != "unsupported"
+                              and cleaned(r, mode) != r["answer"])
             out[mode][kind] = {
+                "handled_rate": None if handled is None else round(handled / len(rows), 3),
+                "good_answers_altered_rate": None if altered is None else round(altered / len(rows), 3),
                 "n": len(rows),
                 "refused": refused, "refused_rate": round(refused / len(rows), 3),
                 "not_grounded_rate": round(flagged / len(rows), 3),
@@ -127,7 +154,9 @@ def main() -> None:
         results.append({
             "qid": c["qid"], "kind": c["kind"], "answer": c["answer"],
             "figures": unsupported_figures(c["answer"], c["contexts"]),
-            **{m: {"status": d.status, "nli": d.nli_grounding, "llm": d.llm_grounding, "score": d.score}
+            "injected": c["injected"],
+            **{m: {"status": d.status, "nli": d.nli_grounding, "llm": d.llm_grounding, "score": d.score,
+                   "invented": d.invented_claims}
                for m, d in dets.items()},
         })
         if i % 40 == 0:
@@ -141,6 +170,11 @@ def main() -> None:
     print(f"{'detector':<20}" + "".join(f"{k:>19}" for k in KINDS))
     for mode in MODES + ["figure_check_only"]:
         print(f"{mode:<20}" + "".join(f"{summary[mode][k]['refused_rate']:>19.1%}" for k in KINDS))
+    print("\nShare of faults that do NOT reach the user (refused, or invented sentence cut out):")
+    print(f"{'detector':<20}" + "".join(f"{k:>19}" for k in KINDS))
+    for mode in MODES:
+        print(f"{mode:<20}" + "".join(f"{summary[mode][k]['handled_rate']:>19.1%}" for k in KINDS))
+    print("Good answers changed by the sentence filter:", {m: summary[m]["good"]["good_answers_altered_rate"] for m in MODES})
     print("\nSame, but ignoring the figure check (NLI/judge scores alone):")
     for mode in MODES:
         print(f"{mode:<20}" + "".join(f"{summary[mode][k]['refused_by_scores_only_rate']:>19.1%}" for k in KINDS))

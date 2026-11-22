@@ -155,12 +155,13 @@ def evaluate_q(retriever, generator, detector, q: dict, scorer: ReferenceScorer 
         for mode in MODES:
             if mode == "none":
                 det = None
-                refused, status, nli, llm, unsupported = False, "unguarded", None, None, []
+                refused, status, nli, llm, unsupported, invented = False, "unguarded", None, None, [], []
                 latency = retrieval_s + gen_s
             else:
                 det = dets[mode]
                 refused, status = det.status == "unsupported", det.status
                 nli, llm, unsupported = det.nli_grounding, det.llm_grounding, det.unsupported_claims
+                invented = det.invented_claims
                 latency = retrieval_s + gen_s + det.seconds
             modes[mode] = {
                 "refused": refused,
@@ -168,6 +169,7 @@ def evaluate_q(retriever, generator, detector, q: dict, scorer: ReferenceScorer 
                 "nli_grounding": nli,
                 "llm_grounding": llm,
                 "unsupported_claims": unsupported,
+                "invented_claims": invented,  # sentences ChatService would cut from the delivered answer
                 "latency": round(latency, 3),
             }
 
@@ -225,6 +227,7 @@ def compute_metrics(rows: list[dict]) -> dict:
                      and not r["modes"][mode]["refused"]]
         quality = {
             "delivered": len(delivered),
+            "answers_with_sentences_removed": sum(bool(r["modes"][mode].get("invented_claims")) for r in delivered),
             "mean_reference_similarity": round(float(np.mean([r["reference_similarity"] for r in delivered])), 3)
             if delivered else None,
             "on_topic_rate": round(sum(r["reference_similarity"] > r["control_similarity"] for r in delivered)
@@ -407,7 +410,8 @@ def main() -> None:
         q = m["answer_quality"]
         if q["delivered"]:
             print(f"      delivered answerable answers: {q['delivered']}  mean similarity to reference reply "
-                  f"{q['mean_reference_similarity']:.3f}  on-topic rate {q['on_topic_rate']:.0%}")
+                  f"{q['mean_reference_similarity']:.3f}  on-topic rate {q['on_topic_rate']:.0%}  "
+                  f"answers with invented sentences removed: {q['answers_with_sentences_removed']}")
     agree = nli_vs_llm_points(rows)
     if len(agree[0]) >= 2:
         print(f"NLI vs LLM-judge correlation (n={len(agree[0])}): {np.corrcoef(*agree)[0, 1]:.3f}")

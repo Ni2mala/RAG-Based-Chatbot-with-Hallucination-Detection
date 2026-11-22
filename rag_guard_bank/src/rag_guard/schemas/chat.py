@@ -13,6 +13,7 @@ class Verification(BaseModel):
     nli_grounding: float | None = None
     llm_grounding: float | None = None
     unsupported_claims: list[str] = Field(default_factory=list)
+    removed_claims: list[str] = Field(default_factory=list)  # invented sentences cut from the answer
     detector: str | None = None
 
 
