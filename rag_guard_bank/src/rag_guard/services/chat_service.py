@@ -3,6 +3,7 @@ from rag_guard.rag.retriever import Retriever
 from rag_guard.rag.generator import Generator
 from rag_guard.schemas.chat import ChatRequest, ChatResponse, Source, Verification
 from rag_guard.guardrails.hallucination_detector import HallucinationDetector
+from rag_guard.guardrails.input_filter import looks_like_injection
 from rag_guard.guardrails.refusal import refusal_message
 
 SELF_REFUSAL_PATTERNS = (
@@ -17,18 +18,36 @@ SELF_REFUSAL_PATTERNS = (
 )
 
 
+# A real refusal is short. Longer text that merely mentions one of the phrases (for example
+# "I could not find X, however here is how to do it: 1. ...") is an answer and goes to the detector.
+MAX_REFUSAL_CHARS = 300
+
+
 def is_self_refusal(answer: str) -> bool:
     lowered = answer.lower()
-    return any(pattern in lowered for pattern in SELF_REFUSAL_PATTERNS)
+    return len(answer) <= MAX_REFUSAL_CHARS and any(p in lowered for p in SELF_REFUSAL_PATTERNS)
 
 
 class ChatService:
-    def __init__(self, retriever: Retriever, generator: Generator) -> None:
+    def __init__(
+        self,
+        retriever: Retriever,
+        generator: Generator,
+        detector: HallucinationDetector | None = None,
+    ) -> None:
         self._retriever = retriever
         self._generator = generator
-        self._detector = HallucinationDetector()
+        self._detector = detector or HallucinationDetector()
 
     def answer(self, request: ChatRequest) -> ChatResponse:
+        if looks_like_injection(request.question):
+            return ChatResponse(
+                answer=refusal_message(),
+                sources=[],
+                verification=Verification(status="blocked_input"),
+                refused=True,
+            )
+
         chunks = self._retriever.retrieve(request.question)
         max_relevance = max((c.score for c in chunks), default=0.0)
         sources = [
@@ -49,9 +68,18 @@ class ChatService:
 
         answer = self._generator.generate(request.question, [c.text for c in chunks])
 
+        if is_self_refusal(answer) and max_relevance >= settings.RETRY_MIN_RELEVANCE:
+            # The small model sometimes refuses on-topic questions; give it a wider context once.
+            chunks = self._retriever.retrieve(request.question, top_k=settings.RETRY_TOP_K)
+            sources = [
+                Source(intent=c.intent, category=c.category, score=round(c.score, 3))
+                for c in chunks
+            ]
+            answer = self._generator.generate(request.question, [c.text for c in chunks])
+
         if is_self_refusal(answer):
             return ChatResponse(
-                answer=answer,
+                answer=refusal_message(),
                 sources=sources,
                 verification=Verification(
                     retrieval_relevance=round(max_relevance, 3),
@@ -60,9 +88,7 @@ class ChatService:
                 refused=True,
             )
 
-        detection = self._detector.detect(
-            answer, [c.text for c in chunks], mode=request.mode
-        )
+        detection = self._detector.detect(answer, [c.text for c in chunks])
 
         refused = detection.status == "unsupported"
         return ChatResponse(

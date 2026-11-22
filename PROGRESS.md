@@ -7,12 +7,13 @@ Banking-domain RAG chatbot ("RAG-Guard") with hallucination detection on the
 Hugging Face Bitext retail-banking dataset (~25.5k rows), for a thesis.
 Local offline stack: Ollama llama3.2 + Chroma vector store + NLI + LLM-judge.
 
-## Quick start (from D:\Thesis\rag_guard_bank)
-- venv: D:\Thesis\.venv (Python 3.13.4)  |  Ollama models: llama3.2, nomic-embed-text
-- API:  .venv\Scripts\python -m uvicorn rag_guard.main:app --app-dir src --port 8000
-- UI:   .venv\Scripts\python -m streamlit run app\ui\streamlit_app.py
-- Rebuild index: python scripts\build_vector_store.py | Re-fetch: python scripts\fetch_dataset.py
-- Smoke: scripts\quick_test.py (RAG), scripts\test_guardrails.py (detectors), scripts\test_nli.py (NLI only)
+## Quick start (from rag_guard_bank/, macOS/Linux)
+- venv: `python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`  |  Ollama models: llama3.2, nomic-embed-text
+- Copy `config/.env.example` to `.env` and set `ADMIN_TOKEN` (admin endpoint stays disabled with the default)
+- API:  `python -m uvicorn rag_guard.main:app --app-dir src --port 8000`
+- UI:   `python -m streamlit run app/ui/streamlit_app.py` (API URL from env `RAG_API_URL`)
+- Rebuild index: `python scripts/build_vector_store.py` | Re-fetch: `python scripts/fetch_dataset.py`
+- Smoke: scripts/quick_test.py (RAG), scripts/test_guardrails.py (detectors), scripts/test_nli.py (NLI only)
 
 ## Stage status
 [1] Config/scaffold + dataset        DONE  (25,545 rows, {{placeholder}} normalized)

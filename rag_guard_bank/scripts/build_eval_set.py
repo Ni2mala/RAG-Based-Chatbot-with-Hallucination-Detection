@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from rag_guard.core.config import settings
 from rag_guard.rag.retriever import Retriever
+from rag_guard.services.ingestion_service import sample_kb_rows
 
 OUT_PATH = settings.DATA_EVAL_DIR / "eval_set.jsonl"
 
@@ -46,17 +47,7 @@ def read_rows() -> dict[int, dict]:
 
 
 def kb_kept_ids(rows: dict[int, dict]) -> set[int]:
-    by_intent: dict[str, list[dict]] = {}
-    for r in rows.values():
-        by_intent.setdefault(r["intent"], []).append(r)
-    kept: set[int] = set()
-    for group in by_intent.values():
-        group.sort(key=lambda r: r["id"])
-        n = min(5, len(group))
-        step = len(group) / n
-        for i in sorted({int(i * step) for i in range(n)}):
-            kept.add(group[i]["id"])
-    return kept
+    return {r["id"] for r in sample_kb_rows(list(rows.values()))}
 
 
 def main() -> None:
@@ -68,7 +59,7 @@ def main() -> None:
 
     def passes(question: str) -> bool:
         chunks = retriever.retrieve(question)
-        return bool(chunks) and chunks[0].score >= 0.55
+        return bool(chunks) and chunks[0].score >= settings.RELEVANCE_MIN_SCORE
 
     def to_item(r: dict) -> dict:
         return {
@@ -118,7 +109,7 @@ def main() -> None:
             print(f"  in-domain OK (fallback): intent={r['intent']}", flush=True)
 
     if len(evals) < 20:
-        print(f"WARNING: only {len(evals)} in-domain candidates cleared the 0.55 bar", flush=True)
+        print(f"WARNING: only {len(evals)} in-domain candidates cleared the {settings.RELEVANCE_MIN_SCORE} bar", flush=True)
 
     for i, item in enumerate(evals, start=1):
         item["id"] = i

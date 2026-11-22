@@ -17,8 +17,8 @@ class Verification(BaseModel):
 
 
 class ChatRequest(BaseModel):
+    # No `mode` field: clients must not be able to switch the guardrails off.
     question: str = Field(..., min_length=1, max_length=500)
-    mode: str | None = None
 
 
 class ChatResponse(BaseModel):

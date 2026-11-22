@@ -20,7 +20,12 @@ def _load_rows() -> list[dict]:
     return rows
 
 
-def _deduplicate(rows: list[dict], per_intent: int = 5) -> list[dict]:
+ROWS_PER_INTENT = 5
+
+
+def sample_kb_rows(rows: list[dict], per_intent: int = ROWS_PER_INTENT) -> list[dict]:
+    """Pick up to per_intent evenly spaced rows per intent. Shared with scripts/build_eval_set.py
+    so the held-out eval questions can never overlap the knowledge base."""
     by_intent: dict[str, list[dict]] = {}
     for row in rows:
         by_intent.setdefault(row["intent"], []).append(row)
@@ -48,11 +53,11 @@ def _build_documents(rows: list[dict]):
     return ids, documents, metadatas
 
 
-def rebuild_index(per_intent: int = 5, reset: bool = True) -> dict:
+def rebuild_index(per_intent: int = ROWS_PER_INTENT, reset: bool = True) -> dict:
     rows = _load_rows()
     logger.info("Raw rows: %d", len(rows))
 
-    deduped = _deduplicate(rows, per_intent)
+    deduped = sample_kb_rows(rows, per_intent)
     intents = sorted({r["intent"] for r in deduped})
     logger.info("Compact KB rows: %d across %d intents", len(deduped), len(intents))
 

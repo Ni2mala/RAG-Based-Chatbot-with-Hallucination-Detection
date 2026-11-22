@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from rag_guard.core.config import settings
 from rag_guard.core.logging import get_logger
 from rag_guard.guardrails.claim_extractor import extract_claims
+from rag_guard.guardrails.figure_check import unsupported_figures
 from rag_guard.guardrails.grounding_check import GroundingChecker
 from rag_guard.guardrails.llm_judge import LLMJudge
 
@@ -59,9 +60,14 @@ class HallucinationDetector:
             unsupported.extend(r["claim"] for r in checks if not r["supported"])
 
         if self._judge is not None and mode in ("llm", "both"):
-            verdict = self._judge.judge(answer, contexts)
-            result.llm_grounding = verdict["score"]
-            unsupported.extend(verdict["unsupported_claims"])
+            try:
+                verdict = self._judge.judge(answer, contexts)
+            except Exception as exc:
+                # Judge down or unparseable: use the other detector instead of scoring 0.
+                logger.warning("LLM judge failed (%s); falling back to NLI only", exc)
+            else:
+                result.llm_grounding = verdict["score"]
+                unsupported.extend(verdict["unsupported_claims"])
 
         if result.nli_grounding is not None and result.llm_grounding is not None:
             score = (result.nli_grounding + result.llm_grounding) / 2
@@ -78,6 +84,12 @@ class HallucinationDetector:
             result.status = "partially_supported"
         else:
             result.status = "unsupported"
+
+        figures = unsupported_figures(answer, contexts)
+        if figures:
+            result.status = "unsupported"
+            unsupported.insert(0, "Figures not found in the documents: " + ", ".join(figures))
+            logger.warning("Unsupported figures in answer: %s", figures)
 
         result.unsupported_claims = unsupported
         logger.info(

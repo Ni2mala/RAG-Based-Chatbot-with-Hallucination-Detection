@@ -1,6 +1,8 @@
 import logging
 import sys
 
+from rag_guard.core.config import settings
+
 
 def get_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
@@ -10,6 +12,6 @@ def get_logger(name: str) -> logging.Logger:
             logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
         )
         logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
+        logger.setLevel(settings.LOG_LEVEL.upper())
     logger.propagate = False
     return logger

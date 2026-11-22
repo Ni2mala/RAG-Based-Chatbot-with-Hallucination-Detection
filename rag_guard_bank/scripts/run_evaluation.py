@@ -37,6 +37,20 @@ def load_done_ids() -> set[int]:
     return {row["id"] for row in data["rows"]}
 
 
+def _row(q: dict, max_rel: float, sources: list, self_ref: bool | None, modes: dict) -> dict:
+    return {
+        "id": q["id"],
+        "question": q["question"],
+        "category": q["category"],
+        "expected_action": q["expected_action"],
+        "expected_grounded": q["expected_grounded"],
+        "max_relevance": round(max_rel, 3),
+        "sources": sources,
+        "self_refusal": self_ref,
+        "modes": modes,
+    }
+
+
 def evaluate_q(retriever, generator, detector, q: dict) -> dict:
     question = q["question"]
     t0 = time.time()
@@ -61,9 +75,16 @@ def evaluate_q(retriever, generator, detector, q: dict) -> dict:
             "latency": round(retrieval_s, 3),
         }
         modes = {m: dict(base) for m in MODES}
+        # Same as production: the gate refusal ends the request, the generator never runs.
+        return _row(q, max_rel, sources, None, modes)
 
     t1 = time.time()
     answer = generator.generate(question, contexts)
+    if is_self_refusal(answer) and max_rel >= settings.RETRY_MIN_RELEVANCE:
+        # Same retry as ChatService, so the evaluation matches production.
+        chunks = retriever.retrieve(question, top_k=settings.RETRY_TOP_K)
+        contexts = [c.text for c in chunks]
+        answer = generator.generate(question, contexts)
     gen_s = time.time() - t1
     self_ref = is_self_refusal(answer)
 
@@ -109,17 +130,7 @@ def evaluate_q(retriever, generator, detector, q: dict) -> dict:
                 "latency": round(total, 3),
             }
 
-    return {
-        "id": q["id"],
-        "question": question,
-        "category": q["category"],
-        "expected_action": q["expected_action"],
-        "expected_grounded": q["expected_grounded"],
-        "max_relevance": round(max_rel, 3),
-        "sources": sources,
-        "self_refusal": self_ref if max_rel >= settings.RELEVANCE_MIN_SCORE else None,
-        "modes": modes,
-    }
+    return _row(q, max_rel, sources, self_ref, modes)
 
 
 def compute_metrics(rows: list[dict]) -> dict:
