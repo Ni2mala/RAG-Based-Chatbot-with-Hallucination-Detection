@@ -8,6 +8,7 @@ from rag_guard.guardrails.grounding_check import GroundingChecker
 from rag_guard.guardrails.llm_judge import LLMJudge
 
 logger = get_logger(__name__)
+DETECTOR_MODES = ("none", "nli", "llm", "both")
 
 
 @dataclass
@@ -28,7 +29,9 @@ class HallucinationDetector:
     @staticmethod
     def _normalize(mode: str) -> str:
         mode = mode.lower().strip()
-        return mode if mode in ("none", "nli", "llm", "both") else "both"
+        if mode not in DETECTOR_MODES:
+            raise ValueError(f"Invalid detector mode {mode!r}; expected one of {DETECTOR_MODES}")
+        return mode
 
     def _ensure_loaded(self, mode: str) -> None:
         if mode in ("nli", "both") and self._nli is None:
@@ -52,11 +55,12 @@ class HallucinationDetector:
         claims = extract_claims(answer)
         unsupported: list[str] = []
 
-        if self._nli is not None and mode in ("nli", "both"):
+        # No claims (a very short answer): NLI has nothing to score, so it is skipped instead of
+        # counting as 0.0 support. The judge still scores the answer, and in nli-only mode the
+        # score stays 0.0, so an unverifiable answer is still refused.
+        if self._nli is not None and mode in ("nli", "both") and claims:
             checks = self._nli.check(claims, contexts)
-            result.nli_grounding = sum(
-                r["supported"] for r in checks
-            ) / max(1, len(checks))
+            result.nli_grounding = sum(r["supported"] for r in checks) / len(checks)
             unsupported.extend(r["claim"] for r in checks if not r["supported"])
 
         if self._judge is not None and mode in ("llm", "both"):

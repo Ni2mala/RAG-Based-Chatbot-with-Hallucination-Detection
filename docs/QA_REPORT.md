@@ -153,3 +153,19 @@ Delivered answers also improved: 24 grounded and 8 partially supported per run, 
 ### What remains (6 of 38, all but one are model self-refusals)
 
 Four slang and typo questions are refused every run (relevance 0.69-0.73, below the retry trigger). Next candidate, not implemented: trigger the retry on agreement of the top-3 retrieved chunks' intent instead of a similarity cutoff, or normalize spelling before retrieval. Each needs the same leak test before adoption. Limits: 2-3 repetitions per configuration (run-to-run variation is about plus or minus 2 questions), question sets written by me, and "unsupported answers" is measured with gold labels only on the 29 unanswerable questions; faithfulness of delivered answers is still not human-labelled.
+
+## Addendum 4: code issues from the analysis PDFs (2026-11-22)
+
+Fixed from `Things_You_Must_Know`, the ADRs and the code analysis. Tests: `rag_guard_bank/tests/test_robustness.py` (4 tests, no Ollama needed, needs torch).
+
+| Issue | Fix | Verified |
+|---|---|---|
+| Ollama down gave a raw 500 | `main.py` maps connection, timeout and Ollama errors to HTTP 503 with a plain message | Test, and a live instance pointed at a dead Ollama host returned 503 |
+| Re-ingest while running might break `/chat` (inferred, never run) | Retriever cache cleared after ingest | **Run on an isolated copy of the index**: ingest returned 210 chunks, the next `/chat` returned 200 without a restart. Your live index was not touched. |
+| Very short answers (no claims over 8 characters) scored NLI 0.0 and dragged the average down | With no claims NLI is skipped. The judge still scores the answer; in nli-only mode it stays refused | Test. Live check: "Yes." and "No." still get judge 0.0 (refused); "$500." scores judge 1.0 but the figure check blocks it |
+| Invalid `DETECTOR_MODE` silently became `both` | `ValueError` at startup (settings validator) and in the detector; case-insensitive | Test |
+| Refusal message quoted unverified model text (pirate speak, duplicated claims) | Fixed wording, no model text. Claims stay in `verification.unsupported_claims` for the UI count | Test |
+| Judge reads the answer unescaped | Answer wrapped in `<answer>` tags, closing tags stripped, judge told it is untrusted | Same judge scores before and after on 3 injection attempts plus a genuine answer. Note: the judge was **not** fooled before the change either, so this is hardening, not a demonstrated fix. |
+| Judge `grounded` field computed but never used | Dropped from the returned result | Grep: no users |
+
+Not fixed (design decisions or larger work): `partially_supported` answers are still delivered (the 0.35 cutoff remains `GROUNDING_THRESHOLD / 2`), no rate limiting or authentication on `/chat`, no CORS or HTTPS policy, fixed 900-character chunking (changing it needs a re-index and a new evaluation), synchronous `/admin/ingest`, dataset revision not pinned, no `pyproject.toml`. State the first three as deployment limitations in the thesis.

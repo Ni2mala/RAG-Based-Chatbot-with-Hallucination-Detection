@@ -18,6 +18,14 @@ Mark items `[x]` as they are done.
 - [x] Tidy: remove the unused `embed_document`, remove the leaked `D:/Thesis` path in `.vscode/settings.json`, and make `LOG_LEVEL` work.
 - [x] Update the Windows paths in `PROGRESS.md` quick start to macOS (venv path, commands).
 
+## 1b. Remaining code issues (from the analysis PDFs)
+
+- [x] Ollama-down returns 503; empty-claim NLI; strict `DETECTOR_MODE`; refusal text without model quotes; re-ingest refresh verified (QA_REPORT Addendum 4).
+- [ ] Decide and document: `partially_supported` answers are delivered; the 0.35 cutoff is `GROUNDING_THRESHOLD / 2`.
+- [ ] Deployment limitations to state in the thesis: no rate limiting or auth on `/chat`, no CORS or HTTPS, synchronous `/admin/ingest`.
+- [ ] Chunking (900 chars): tail chunks lose the "Question:" header; changing it needs re-index plus re-evaluation.
+- [ ] Pin the Hugging Face dataset revision; add `pyproject.toml` so scripts need no `sys.path` patching; remove unused `APP_ENV`.
+
 ## 2. Improve detection quality (the research core, 40 + 20 marks)
 
 - [x] NLI now uses sentence-window premises (top 3 per claim): false refusals 30% -> 16%, no extra unanswerable answers (see QA_REPORT Addendum 3).
@@ -28,7 +36,8 @@ Mark items `[x]` as they are done.
 - [ ] Re-tune thresholds on labeled data: NLI entail 0.4, relevance gate (about 0.68 separated better), `GROUNDING_THRESHOLD`, `TOP_K`.
 - [x] Hard-block answers that contain numbers not in the documents (ADR-04 follow-up). Still open: other partially_supported answers ship.
 - [x] Basic input-side injection screening (`input_filter.py`) and unsupported-figure check (`figure_check.py`).
-- [ ] Optional: sanitise the answer before the judge prompt (injection through the answer); replace the keyword filter with a classifier.
+- [x] Judge prompt hardened against instructions inside the answer (not shown to be exploitable).
+- [ ] Optional: replace the keyword injection filter with a classifier.
 - [ ] Optional: compare against the verbatim-retrieval baseline (return the matched KB answer, ADR-01).
 
 ## 3. Evaluation (20 marks, needs real rigor)

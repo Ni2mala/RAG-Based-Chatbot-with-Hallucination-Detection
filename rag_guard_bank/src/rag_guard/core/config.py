@@ -1,4 +1,5 @@
 from pathlib import Path
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -30,6 +31,14 @@ class Settings(BaseSettings):
 
     NLI_MODEL: str = "cross-encoder/nli-deberta-v3-small"
     DETECTOR_MODE: str = "both"
+
+    @field_validator("DETECTOR_MODE")
+    @classmethod
+    def _valid_mode(cls, v: str) -> str:
+        v = v.lower().strip()
+        if v not in ("none", "nli", "llm", "both"):
+            raise ValueError(f"DETECTOR_MODE must be none, nli, llm or both, got {v!r}")
+        return v
 
     DATA_RAW_DIR: Path = PROJECT_ROOT / "data/raw"
     DATA_EVAL_DIR: Path = PROJECT_ROOT / "data/evaluation"
