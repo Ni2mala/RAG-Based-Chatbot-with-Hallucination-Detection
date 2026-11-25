@@ -1,14 +1,29 @@
+from contextlib import asynccontextmanager
+
 import httpx
 import ollama
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from rag_guard.api.dependencies import get_detector
 from rag_guard.api.routes import admin, chat, health
 from rag_guard.core.logging import get_logger
 
 logger = get_logger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        get_detector().warm_up()
+    except Exception as exc:
+        # Not fatal: the models are loaded again on the first question.
+        logger.warning("Detector warm-up failed: %s", exc)
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="RAG-Guard Banking Chatbot",
     description="Banking-domain RAG chatbot with hallucination detection (in progress).",
     version="0.1.0",

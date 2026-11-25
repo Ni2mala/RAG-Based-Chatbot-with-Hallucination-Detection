@@ -10,7 +10,7 @@ API_URL = os.getenv("RAG_API_URL", "http://127.0.0.1:8000")
 
 
 def ask(question: str) -> dict:
-    resp = requests.post(f"{API_URL}/chat", json={"question": question}, timeout=180)
+    resp = requests.post(f"{API_URL}/chat", json={"question": question}, timeout=600)
     resp.raise_for_status()
     return resp.json()
 

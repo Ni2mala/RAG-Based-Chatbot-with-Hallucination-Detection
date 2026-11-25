@@ -43,6 +43,12 @@ class HallucinationDetector:
         if mode in ("llm", "both") and self._judge is None:
             self._judge = LLMJudge()
 
+    def warm_up(self) -> None:
+        """Load the configured models now and run one NLI check, so the first question does not pay for it."""
+        self._ensure_loaded(self._mode)
+        if self._nli is not None:
+            self._nli.check(["The account is open."], ["The account is open."])
+
     def detect(
         self,
         answer: str,

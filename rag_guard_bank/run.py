@@ -17,7 +17,7 @@ API_PORT = int(os.getenv("API_PORT", "8000"))
 UI_PORT = int(os.getenv("UI_PORT", "8501"))
 
 
-def wait_for_api(proc: subprocess.Popen, timeout_s: int = 120) -> bool:
+def wait_for_api(proc: subprocess.Popen, timeout_s: int = 600) -> bool:
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         if proc.poll() is not None:
@@ -53,7 +53,7 @@ def main() -> int:
     )
     ui = None
     try:
-        print(f"Starting API on port {API_PORT} ...")
+        print(f"Starting API on port {API_PORT} (loading models, can take a few minutes) ...")
         if not wait_for_api(api):
             print("The API did not start; see the messages above.")
             return 1
