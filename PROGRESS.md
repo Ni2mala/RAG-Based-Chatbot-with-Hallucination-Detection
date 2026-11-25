@@ -16,6 +16,7 @@ MSc AI dissertation: a banking RAG chatbot with hallucination detection on the H
 | `THESIS_DOCUMENTATION.md`, `WALKTHROUGH.md` | **Stale**: describe the old 35-question results and old behaviour |
 
 ## Run it (from `rag_guard_bank/`, venv in `.venv`)
+- One command (API and UI): `python run.py` with the venv active; set `API_PORT` / `UI_PORT` if 8000 / 8501 are busy. Windows venv: `D:\Thesis\.venv\Scripts\activate`
 - `source .venv/bin/activate`; Ollama models `llama3.2`, `nomic-embed-text`
 - API: `python -m uvicorn rag_guard.main:app --app-dir src --port 8000` (restart after code changes)
 - UI: `python -m streamlit run app/ui/streamlit_app.py`
