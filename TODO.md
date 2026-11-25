@@ -13,7 +13,7 @@ Mark items `[x]` as they are done.
 - [x] Refresh the retriever's collection after `/admin/ingest` (the cached handle likely goes stale). Test it, since this is only inferred.
 - [x] Add timeouts and one retry around Ollama calls. If the judge fails, fall back to NLI only instead of scoring 0.0.
 - [x] `requirements.txt`: added `torch` and `numpy`, removed unused `pandas`/`pyarrow`/`python-dotenv`.
-- [ ] Pin versions: run `pip freeze` in the venv that has a known-good run (needs the working environment, not done yet).
+- [x] Pin versions: direct dependencies pinned in `requirements.txt` from the Windows venv (`D:\Thesis\.venv`, Python 3.13.4) where all six test files pass (2026-11-25). Not yet confirmed by a full `run_evaluation.py --fresh` on these versions.
 - [x] Make the thresholds single-source: share the KB sampling function and the 0.55 and 5 constants between ingestion and `build_eval_set.py`; take the 0.7 in the judge prompt from config.
 - [x] Tidy: remove the unused `embed_document`, remove the leaked `D:/Thesis` path in `.vscode/settings.json`, and make `LOG_LEVEL` work.
 - [x] Update the Windows paths in `PROGRESS.md` quick start to macOS (venv path, commands).
@@ -57,7 +57,7 @@ Mark items `[x]` as they are done.
 
 - [ ] **Ethics form**: complete the online faculty ethics form and submit the emailed PDF to its Canvas assignment. Check whether it is done already.
 - [ ] **Interim review**: report (at most 2,500 words) plus a draft literature review chapter. Confirm the due date with the supervisor.
-- [ ] Check the University's **Student Use of AI Policy** and decide what to declare.
+- [ ] **Student Use of AI Policy** (read 2026-11-25, Senate v1.00): for a research thesis, discuss AI use with the supervisor. Without explicit permission AI may not write or rewrite the work, and AI-generated code must be acknowledged. Still to do: agree the scope with the supervisor and write the AI-use statement (code assistance, any structure or proofreading help).
 - [ ] Confirm the proposal's scope changes (Ollama and Chroma instead of LangChain) with the supervisor and record them.
 
 ## 5. Dissertation report (target at most 20,000 words, template + single PDF)

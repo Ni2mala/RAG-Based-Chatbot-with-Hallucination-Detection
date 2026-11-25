@@ -1,12 +1,13 @@
-fastapi
-uvicorn[standard]
-streamlit
-requests
-pydantic-settings
-datasets
-chromadb
-ollama
-transformers
-torch
-numpy
-matplotlib
+# Pinned from a venv where all six test files pass (Python 3.13.4, Windows, CPU-only torch).
+fastapi==0.141.1
+uvicorn[standard]==0.54.0
+streamlit==1.64.0
+requests==2.34.2
+pydantic-settings==2.15.0
+datasets==5.0.1
+chromadb==1.5.9
+ollama==0.6.2
+transformers==5.17.0
+torch==2.14.0
+numpy==2.5.3
+matplotlib==3.11.2

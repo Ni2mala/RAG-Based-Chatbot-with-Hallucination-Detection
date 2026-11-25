@@ -40,7 +40,7 @@ keyword injection filter -> retrieval gate (0.55) -> llama3.2 (one retry with 8 
 ## Next steps
 1. University items (owner): ethics form, interim review date, AI-use policy, confirm Ollama/Chroma instead of LangChain with the supervisor.
 2. Dissertation, literature review first (the interim review needs it).
-3. Optional engineering: pin dependency versions, remaining items in `TODO.md`.
+3. Optional engineering: remaining items in `TODO.md` (dependency versions pinned 2026-11-25; all six test files pass on Windows with them).
 
 ## Pitfalls
 - HF pipeline pairs must be `{"text":..,"text_pair":..}`.
