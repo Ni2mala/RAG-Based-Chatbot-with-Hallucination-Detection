@@ -1,57 +1,48 @@
-# RAG-Guard Thesis — Session Handoff
+# RAG-Guard Thesis: Session Handoff
 
-Updated: 2026-09-26
+Updated: 2026-11-25. **Start here**, then `TODO.md`.
 
 ## What this project is
-Banking-domain RAG chatbot ("RAG-Guard") with hallucination detection on the
-Hugging Face Bitext retail-banking dataset (~25.5k rows), for a thesis.
-Local offline stack: Ollama llama3.2 + Chroma vector store + NLI + LLM-judge.
+MSc AI dissertation: a banking RAG chatbot with hallucination detection on the Hugging Face Bitext retail-banking dataset (synthetic, 25,545 rows). Local stack: Ollama llama3.2 + Chroma + NLI + LLM judge. Deadline **12 Jan 2027, 19:30** (report PDF and code ZIP).
 
-## Quick start (from rag_guard_bank/, macOS/Linux)
-- venv: `python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt`  |  Ollama models: llama3.2, nomic-embed-text
-- Copy `config/.env.example` to `.env` and set `ADMIN_TOKEN` (admin endpoint stays disabled with the default)
-- API:  `python -m uvicorn rag_guard.main:app --app-dir src --port 8000`
-- UI:   `python -m streamlit run app/ui/streamlit_app.py` (API URL from env `RAG_API_URL`)
-- Rebuild index: `python scripts/build_vector_store.py` | Re-fetch: `python scripts/fetch_dataset.py`
-- Smoke: scripts/quick_test.py (RAG), scripts/test_guardrails.py (detectors), scripts/test_nli.py (NLI only)
+## Where things are
+| File | Content |
+|---|---|
+| `TODO.md` | Full task list with status |
+| `docs/university/ASSIGNMENT_BRIEF.md` | Deadline, word limit, marking scheme (proposal and rubric beside it) |
+| `docs/EVALUATION_V2.md` | **Current results and limits; quote these** |
+| `docs/QA_REPORT.md` | QA runs, root-cause analysis, fixes (addenda 1-4) |
+| `docs/analysis/*.pdf` | Earlier code analysis and ADRs (gitignored; many issues since fixed) |
+| `THESIS_DOCUMENTATION.md`, `WALKTHROUGH.md` | **Stale**: describe the old 35-question results and old behaviour |
 
-## Stage status
-[1] Config/scaffold + dataset        DONE  (25,545 rows, {{placeholder}} normalized)
-[2] RAG pipeline                     DONE  (130 docs / 210 chunks, Chroma `bank_faq`)
-[3] FastAPI + Streamlit UI           DONE  (/chat /health /admin/ingest)
-[4] UI verified + wording polish     DONE
-[5] Hallucination detectors          DONE & VALIDATED (NLI label bug fixed; "none" baseline mode added)
-[6] Evaluation harness (metrics)     DONE  (35-q eval -> reports/; see THESIS_DOCUMENTATION.md)
-[7] Tests/Docker + code walkthrough  OPTIONAL (not started)
+## Run it (from `rag_guard_bank/`, venv in `.venv`)
+- `source .venv/bin/activate`; Ollama models `llama3.2`, `nomic-embed-text`
+- API: `python -m uvicorn rag_guard.main:app --app-dir src --port 8000` (restart after code changes)
+- UI: `python -m streamlit run app/ui/streamlit_app.py`
+- Index: `python scripts/build_vector_store.py`
+- Tests: `python tests/test_<name>.py` (six files)
+- Evaluation: `python scripts/run_evaluation.py --fresh` (~7 min); fault test: `python scripts/fault_injection_test.py` (~10 min)
 
-## Open items (stage 5)
-1. [RESOLVED] NLI label-mapping bug. Fixed in grounding_check.py (_resolve + top_k + lowercase).
-2. [DONE] Self-refusal no longer double-wrapped (is_self_refusal in chat_service).
-3. [DONE] Streamlit shows NLI / LLM-judge scores + unsupported-claims count.
+## Request pipeline
+keyword injection filter -> retrieval gate (0.55) -> llama3.2 (one retry with 8 chunks if it refuses at relevance >= 0.75) -> NLI (3 best sentence windows per claim) + LLM judge, averaged; any figure absent from the documents blocks the answer -> invented sentences (NLI-unsupported and >= 50% new words) are cut.
 
-## Verified behavior
-- Blocked card → NLI 0.57 vs LLM-judge 0.9 → both-mode avg 0.735 = grounded.
-  NLI is claim-strict, judge holistic (thesis finding).
-- "How long does a bank transfer take?" → refused; NLI=0.0 AND judge=0.0 (no data in KB)
-- "Weather in Paris?" → refused at retrieval (relevance 0.475 < 0.55), no LLM cost
+## Latest results (129 questions: 78 answerable, 51 unanswerable)
+- Mode `both`: false refusals 14/78 (18%), unanswerable answered 0/51. Without detector: 12/78 and 6/51.
+- Fault test (`both`): invented sentence or figure kept from the user 100%; wrong-topic answers refused 80%; good answers refused or altered 0%.
+- Delivered answers are on topic against the dataset's reference replies (100%).
+- Retrieval is not the problem: right intent in top 5 for 99.5%; hybrid search and metadata filtering did not help.
 
-## Key design facts
-- Modes: DETECTOR_MODE=nli|llm|both (default both). Score = NLI+LLM avg when both.
-  grounded >= 0.7, unsupported < 0.35 → raises refusal ("Please contact support").
-- Embeddings nomic-embed-text 768d with search_query:/search_document: prefixes, batch 32.
-- KB sampling: max 5 evenly-spaced rows per intent (40k row full index too slow on CPU).
-- Thresholds/.env: RELEVANCE_MIN_SCORE=0.55, GROUNDING_THRESHOLD=0.7, ADMIN_TOKEN.
+## Known gaps
+- Invented claims that reuse the documents' words are cut only 54% of the time.
+- Most remaining false refusals are the model's own, mainly slang and typo questions.
+- No human faithfulness labels (owner's decision), so no hallucination rate on natural answers.
 
-## Next session checklist
-1. Review/edit THESIS_DOCUMENTATION.md (results now filled from real run)
-2. Optional tuning: NLI entail_threshold, GROUNDING_THRESHOLD, TOP_K (8?) to cut
-   in-domain over-refusal (nli wrongly refused 85% of in-domain in eval)
-3. Optional: tests (pytest), Docker packaging
-4. Optional: full code walkthrough with user
-5. Optional: add HF_TOKEN to silence download warning
-6. Future: bigger labeled eval set for statistical significance
+## Next steps
+1. University items (owner): ethics form, interim review date, AI-use policy, confirm Ollama/Chroma instead of LangChain with the supervisor.
+2. Dissertation, literature review first (the interim review needs it).
+3. Optional engineering: pin dependency versions, remaining items in `TODO.md`.
 
 ## Pitfalls
-- HF pipeline pairs must be {"text":..,"text_pair":..} and return a dict (not list)
-- NLI DeBERTa: 534MB first download (cached); truncate chunks (512-token window)
-- Don't commit storage/ (Chroma) — ignored via .gitignore
+- HF pipeline pairs must be `{"text":..,"text_pair":..}`.
+- `storage/` is gitignored; rebuild the index on a fresh clone.
+- Results change with prompt, model or thresholds; the evaluation script refuses to mix configurations (`--fresh`).
